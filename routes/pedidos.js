@@ -9,4 +9,7 @@ router.post("/", pedidoController.crearPedido);
 // Endpoint para obtener el historial de pedidos de un usuario
 router.get("/historial/:id_usuario", pedidoController.getHistorial);
 
+// Endpoint para generar una factura
+router.get("/factura/:id_pedido", pedidoController.generarFactura);
+
 module.exports = router;
