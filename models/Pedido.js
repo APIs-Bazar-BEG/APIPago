@@ -3,12 +3,12 @@ const db = require("../config/db");
 
 const Pedido = {
   crearPedido: async (id_usuario, productos) => {
-    // 1. Iniciar una transacción
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
-
+    let connection;
     try {
-      // 2. Insertar el nuevo pedido en la tabla 'pedidos'
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Crear pedido
       const [pedidoResult] = await connection.query(
         "INSERT INTO pedidos (id_usuario, total, estado) VALUES (?, ?, ?)",
         [id_usuario, 0, "pendiente"]
@@ -16,8 +16,6 @@ const Pedido = {
       const id_pedido = pedidoResult.insertId;
 
       let total = 0;
-
-      // 3. Insertar cada producto en 'detalle_pedido'
       for (const producto of productos) {
         await connection.query(
           "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
@@ -26,36 +24,93 @@ const Pedido = {
         total += producto.precio * producto.cantidad;
       }
 
-      // 4. Actualizar el total del pedido
+      // Actualizar total del pedido
       await connection.query("UPDATE pedidos SET total = ? WHERE id = ?", [
         total,
         id_pedido,
       ]);
 
-      // 5. Finalizar la transacción
       await connection.commit();
-      connection.release();
-
-      return { id: id_pedido, total: total };
+      return { id_pedido, total };
     } catch (error) {
-      // 6. Si algo falla, deshacer todos los cambios
-      await connection.rollback();
-      connection.release();
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  },
+
+  actualizarEstadoPedido: async (
+    id_pedido,
+    estado,
+    id_transaccion,
+    metodo_pago
+  ) => {
+    let connection;
+    try {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Actualizar estado del pedido
+      await connection.query("UPDATE pedidos SET estado = ? WHERE id = ?", [
+        estado,
+        id_pedido,
+      ]);
+
+      // Insertar pago si se proporcionó id_transaccion
+      if (id_transaccion && metodo_pago) {
+        const [pedido] = await connection.query(
+          "SELECT total FROM pedidos WHERE id = ?",
+          [id_pedido]
+        );
+        const monto = pedido[0]?.total || 0;
+
+        await connection.query(
+          "INSERT INTO pagos (id_pedido, id_transaccion, metodo_pago, monto) VALUES (?, ?, ?, ?)",
+          [id_pedido, id_transaccion, metodo_pago, monto]
+        );
+      }
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  },
+
+  getHistorial: async (id_usuario) => {
+    try {
+      const [rows] = await db.query(
+        `SELECT p.id, p.fecha_creacion, p.estado, p.total, dp.id_producto, dp.cantidad, dp.precio_unitario, pr.nombre AS nombre_producto
+         FROM pedidos p
+         INNER JOIN detalle_pedido dp ON p.id = dp.id_pedido
+         INNER JOIN BazarBEG_Cliente.productos pr ON dp.id_producto = pr.id
+         WHERE p.id_usuario = ?
+         ORDER BY p.fecha_creacion DESC`,
+        [id_usuario]
+      );
+      return rows;
+    } catch (error) {
       throw error;
     }
   },
 
-  // Función para obtener el historial de pedidos de un usuario
-  getHistorial: async (id_usuario) => {
-    const [rows] = await db.query(
-      `SELECT p.id, p.fecha_creacion, p.estado, p.total, dp.nombre_producto, dp.cantidad
-       FROM pedidos p
-       INNER JOIN detalle_pedido dp ON p.id = dp.id_pedido
-       WHERE p.id_usuario = ?
-       ORDER BY p.fecha_creacion DESC`,
-      [id_usuario]
-    );
-    return rows;
+  getDetallePedido: async (id_pedido) => {
+    try {
+      const [rows] = await db.query(
+        `SELECT dp.id_producto, dp.cantidad, dp.precio_unitario, pr.nombre AS nombre_producto
+         FROM detalle_pedido dp
+         INNER JOIN BazarBEG_Cliente.productos pr ON dp.id_producto = pr.id
+         WHERE dp.id_pedido = ?`,
+        [id_pedido]
+      );
+      return rows;
+    } catch (error) {
+      throw error;
+    }
   },
 };
 
