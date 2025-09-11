@@ -4,6 +4,21 @@ const path = require("path");
 const fs = require("fs");
 const pedidoController = require("../controllers/pedidoController");
 
+// Listar todos los pedidos
+router.get("/", pedidoController.listarPedidos);
+
+// Obtener pedido por ID
+router.get("/:id_pedido", pedidoController.getPedido);
+
+// Actualizar pedido
+router.put("/:id_pedido", pedidoController.actualizarPedido);
+
+// Eliminar pedido
+router.delete("/:id_pedido", pedidoController.eliminarPedido);
+
+// Historial por usuario
+router.get("/historial/:id_usuario", pedidoController.getHistorial);
+
 // Endpoint para crear un nuevo pedido
 router.post("/", pedidoController.crearPedido);
 

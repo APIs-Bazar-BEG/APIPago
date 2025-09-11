@@ -112,6 +112,39 @@ const Pedido = {
       throw error;
     }
   },
+
+  getTodosPedidos: async () => {
+    try {
+      const [rows] = await db.query(
+        "SELECT * FROM pedidos ORDER BY fecha_creacion DESC"
+      );
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  eliminarPedido: async (id_pedido) => {
+    let connection;
+    try {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+      await connection.query("DELETE FROM detalle_pedido WHERE id_pedido = ?", [
+        id_pedido,
+      ]);
+      await connection.query("DELETE FROM pagos WHERE id_pedido = ?", [
+        id_pedido,
+      ]);
+      await connection.query("DELETE FROM pedidos WHERE id = ?", [id_pedido]);
+      await connection.commit();
+      return true;
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  },
 };
 
 module.exports = Pedido;
