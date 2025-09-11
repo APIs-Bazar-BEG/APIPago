@@ -1,4 +1,4 @@
-// utils/generadorFacturas.js
+// Generador de facturas en PDF
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 
