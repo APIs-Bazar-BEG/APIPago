@@ -1,3 +1,4 @@
+//Controlador para manejar pedidos
 const Pedido = require("../models/Pedido");
 const { crearFactura } = require("../utils/generadorFacturas");
 
