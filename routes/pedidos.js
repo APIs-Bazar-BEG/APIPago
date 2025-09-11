@@ -10,28 +10,28 @@ router.post("/", pedidoController.crearPedido);
 // Endpoint para obtener el historial de pedidos de un usuario
 router.get("/historial/:id_usuario", pedidoController.getHistorial);
 
-// Endpoint unificado para descargar factura
+// Descargar factura Stripe o PayPal
 router.get("/factura/:id_pedido", (req, res) => {
   const id_pedido = req.params.id_pedido;
 
-  // Priorizar PDF de Stripe, si no existe, buscar de PayPal
-  let rutaFactura = path.join(
+  const rutaFacturaStripe = path.join(
     __dirname,
     "../facturas",
     `factura_stripe_${id_pedido}.pdf`
   );
+  const rutaFacturaPaypal = path.join(
+    __dirname,
+    "../facturas",
+    `factura_paypal_${id_pedido}.pdf`
+  );
 
-  if (!fs.existsSync(rutaFactura)) {
-    rutaFactura = path.join(
-      __dirname,
-      "../facturas",
-      `factura_paypal_${id_pedido}.pdf`
-    );
+  let rutaFactura = null;
 
-    if (!fs.existsSync(rutaFactura)) {
-      return res.status(404).json({ error: "Factura no encontrada" });
-    }
-  }
+  if (fs.existsSync(rutaFacturaStripe)) rutaFactura = rutaFacturaStripe;
+  else if (fs.existsSync(rutaFacturaPaypal)) rutaFactura = rutaFacturaPaypal;
+
+  if (!rutaFactura)
+    return res.status(404).json({ error: "Factura no encontrada" });
 
   res.sendFile(rutaFactura);
 });

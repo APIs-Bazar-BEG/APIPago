@@ -1,6 +1,8 @@
-// controllers/pagoController.js
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Pedido = require("../models/Pedido");
+const { crearFactura } = require("../utils/generadorFacturas");
+const fs = require("fs");
+const path = require("path");
 
 const pagoController = {
   // Crear intención de pago
@@ -14,26 +16,20 @@ const pagoController = {
           .json({ error: "No hay productos en el pedido." });
       }
 
-      // Calcular el total
-      const total = productos.reduce(
-        (acc, p) => acc + p.precio * p.cantidad,
-        0
-      );
+      // Guardar pedido en BD
+      const nuevoPedido = await Pedido.crearPedido(id_usuario, productos);
 
-      // Guardar el pedido en la base de datos
-      const nuevoPedido = await Pedido.crearPedido(
-        id_usuario,
-        productos,
-        total
-      );
+      // Calcular total
+      const total = nuevoPedido.total;
 
+      // Crear PaymentIntent en Stripe
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(total * 100),
         currency: "usd",
         metadata: { id_pedido: String(nuevoPedido.id_pedido) },
         automatic_payment_methods: {
           enabled: true,
-          allow_redirects: "never",
+          allow_redirects: "never", // ⚠️ importante: aquí dentro
         },
       });
 
@@ -48,6 +44,7 @@ const pagoController = {
     }
   },
 
+  // Confirmar pago y generar factura
   confirmarPago: async (req, res) => {
     try {
       const { paymentIntentId } = req.body;
@@ -56,15 +53,13 @@ const pagoController = {
         return res.status(400).json({ error: "Falta paymentIntentId" });
       }
 
-      // Confirmar el pago directamente con tarjeta de prueba
+      // Confirmar PaymentIntent en modo sandbox
       const paymentIntent = await stripe.paymentIntents.confirm(
         paymentIntentId,
         {
-          payment_method: "pm_card_visa", // modo sandbox
+          payment_method: "pm_card_visa",
         }
       );
-
-      console.log("PaymentIntent confirmado:", paymentIntent);
 
       const id_pedido = paymentIntent.metadata?.id_pedido;
       if (!id_pedido) {
@@ -74,15 +69,44 @@ const pagoController = {
       }
 
       if (paymentIntent.status === "succeeded") {
+        // Actualizar estado del pedido
         await Pedido.actualizarEstadoPedido(
           id_pedido,
           "pagado",
           paymentIntent.id,
           "Stripe"
         );
+
+        // Obtener detalles del pedido
+        const productos = await Pedido.getDetallePedido(id_pedido);
+        const total = productos.reduce(
+          (acc, p) => acc + p.precio_unitario * p.cantidad,
+          0
+        );
+
+        // Crear factura PDF
+        const factura = {
+          id: id_pedido,
+          total,
+          items: productos.map((p) => ({
+            nombre: p.nombre_producto,
+            cantidad: p.cantidad,
+            precio_unitario: p.precio_unitario,
+            total_item: p.cantidad * p.precio_unitario,
+          })),
+        };
+
+        const rutaFactura = path.join(
+          __dirname,
+          "../facturas",
+          `factura_stripe_${id_pedido}.pdf`
+        );
+        crearFactura(factura, rutaFactura);
+
         return res.status(200).json({
           mensaje: "Pago confirmado y pedido actualizado.",
           paymentIntent,
+          urlFactura: `http://localhost:3001/api/v1/pedidos/factura/${id_pedido}`,
         });
       } else {
         await Pedido.actualizarEstadoPedido(
@@ -92,7 +116,7 @@ const pagoController = {
           "Stripe"
         );
         return res.status(400).json({
-          mensaje: "El pago no se pudo completar.",
+          mensaje: "Pago no completado",
           estado: paymentIntent.status,
         });
       }
