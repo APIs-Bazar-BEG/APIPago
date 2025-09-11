@@ -19,7 +19,7 @@ const Pedido = {
       for (const producto of productos) {
         await connection.query(
           "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
-          [id_pedido, producto.id, producto.cantidad, producto.precio]
+          [id_pedido, producto.id_producto, producto.cantidad, producto.precio]
         );
         total += producto.precio * producto.cantidad;
       }

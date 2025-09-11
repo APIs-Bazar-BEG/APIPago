@@ -7,4 +7,7 @@ const paypalController = require("../controllers/paypalController");
 router.post("/stripe/crear-intencion", pagoController.crearIntencionPago);
 router.post("/stripe/confirmar-pago", pagoController.confirmarPago);
 
+// Crear orden PayPal
+router.post("/paypal/crear-pedido", paypalController.crearPedido);
+router.post("/paypal/capturar-pago", paypalController.capturarPago);
 module.exports = router;
