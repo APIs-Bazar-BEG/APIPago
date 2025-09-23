@@ -1,15 +1,18 @@
-// config/db.js
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+const mysql = require("mysql2");
+const fs = require("fs");
+require("dotenv").config();
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_DATABASE,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+const config = {
+  // Usamos la URI desde las variables de entorno
+  uri: process.env.DB_URI,
 
-module.exports = pool;
+  // Configuración SSL usando directamente el archivo ca.pem
+  ssl: {
+    ca: fs.readFileSync(__dirname + "/ca.pem"),
+    rejectUnauthorized: true,
+  },
+};
+
+const pool = mysql.createPool(config);
+
+module.exports = pool.promise();
