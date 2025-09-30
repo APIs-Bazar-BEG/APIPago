@@ -217,6 +217,59 @@ const Pedido = {
       if (connection) connection.release();
     }
   },
+
+  // Agregar cantidad a un producto existente o insertarlo si no existe
+  agregarOCambiarCantidadProducto: async (
+    id_pedido,
+    { id_producto, cantidad, precio_unitario }
+  ) => {
+    let connection;
+    try {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Verificar si el producto ya existe en el pedido
+      const [rows] = await connection.query(
+        "SELECT cantidad FROM detalle_pedido WHERE id_pedido = ? AND id_producto = ?",
+        [id_pedido, id_producto]
+      );
+
+      if (rows.length > 0) {
+        // Si existe, sumar la cantidad
+        const nuevaCantidad = rows[0].cantidad + cantidad;
+        await connection.query(
+          "UPDATE detalle_pedido SET cantidad = ? WHERE id_pedido = ? AND id_producto = ?",
+          [nuevaCantidad, id_pedido, id_producto]
+        );
+      } else {
+        // Si no existe, insertarlo
+        await connection.query(
+          "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
+          [id_pedido, id_producto, cantidad, precio_unitario]
+        );
+      }
+
+      // Recalcular total del pedido
+      const [suma] = await connection.query(
+        "SELECT SUM(cantidad * precio_unitario) AS total FROM detalle_pedido WHERE id_pedido = ?",
+        [id_pedido]
+      );
+      const total = suma[0]?.total || 0;
+
+      await connection.query("UPDATE pedidos SET total = ? WHERE id = ?", [
+        total,
+        id_pedido,
+      ]);
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  },
 };
 
 module.exports = Pedido;

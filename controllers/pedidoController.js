@@ -137,7 +137,7 @@ const pedidoController = {
       });
 
       // Obtener lista actualizada del pedido
-      const pedidoActualizado = await Pedido.getDetallePedido(pedido.id_pedido);
+      const pedidoActualizado = await Pedido.getDetallePedido(pedido.id);
 
       res.status(200).json({
         mensaje: "Producto agregado al carrito",
@@ -147,6 +147,38 @@ const pedidoController = {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Error al agregar producto al carrito" });
+    }
+  },
+
+  // Actualizar cantidad de producto en el carrito
+  actualizarCantidadProducto: async (req, res) => {
+    try {
+      const { id_usuario, id_producto, cantidad, precio_unitario } = req.body;
+
+      // Verificar si hay pedido pendiente
+      let pedido = await Pedido.getPedidoPendiente(id_usuario);
+      if (!pedido) {
+        return res.status(404).json({ error: "No hay carrito activo" });
+      }
+
+      // Actualizar o agregar producto
+      await Pedido.agregarOCambiarCantidadProducto(pedido.id, {
+        id_producto,
+        cantidad,
+        precio_unitario,
+      });
+
+      // Obtener carrito actualizado
+      const pedidoActualizado = await Pedido.getDetallePedido(pedido.id);
+
+      res.status(200).json({
+        mensaje: "Carrito actualizado correctamente",
+        id_pedido: pedido.id,
+        pedido: pedidoActualizado,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error al actualizar carrito" });
     }
   },
 };

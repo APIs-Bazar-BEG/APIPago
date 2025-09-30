@@ -18,6 +18,12 @@ router.get("/", pedidoController.listarPedidos);
 // Agregar producto al carrito
 router.post("/carrito/agregar", pedidoController.agregarProductoCarrito);
 
+// Actualizar cantidad de producto en carrito
+router.put(
+  "/carrito/actualizar-producto",
+  pedidoController.actualizarCantidadProducto
+);
+
 //Obtener pedido por ID
 router.get(
   "/:id_pedido",
