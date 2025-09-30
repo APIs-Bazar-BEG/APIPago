@@ -145,6 +145,57 @@ const Pedido = {
       if (connection) connection.release();
     }
   },
+
+  // Obtener pedido pendiente de un usuario
+  getPedidoPendiente: async (id_usuario) => {
+    try {
+      const [rows] = await db.query(
+        "SELECT * FROM pedidos WHERE id_usuario = ? AND estado = 'pendiente' LIMIT 1",
+        [id_usuario]
+      );
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Agregar producto a un pedido existente
+  agregarProductoAPedido: async (
+    id_pedido,
+    { id_producto, cantidad, precio_unitario }
+  ) => {
+    let connection;
+    try {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Insertar producto al detalle del pedido
+      await connection.query(
+        "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
+        [id_pedido, id_producto, cantidad, precio_unitario]
+      );
+
+      // Recalcular total del pedido
+      const [suma] = await connection.query(
+        "SELECT SUM(cantidad * precio_unitario) AS total FROM detalle_pedido WHERE id_pedido = ?",
+        [id_pedido]
+      );
+      const total = suma[0]?.total || 0;
+
+      await connection.query("UPDATE pedidos SET total = ? WHERE id = ?", [
+        total,
+        id_pedido,
+      ]);
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  },
 };
 
 module.exports = Pedido;

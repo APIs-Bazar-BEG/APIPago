@@ -15,6 +15,8 @@ const pedidosRouter = require("./routes/pedidos");
 // Importar las rutas de pagos
 const pagosRouter = require("./routes/pagos");
 
+app.use("/api/v1/pedidos", pedidosRoutes);
+
 // Middleware para procesar JSON en las solicitudes
 app.use(express.json());
 

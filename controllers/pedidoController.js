@@ -115,6 +115,40 @@ const pedidoController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  // Agregar producto al carrito (pedido activo)
+  agregarProductoCarrito: async (req, res) => {
+    try {
+      const { id_usuario, id_producto, cantidad, precio_unitario } = req.body;
+
+      // Verificar si el usuario ya tiene un pedido en estado "pendiente"
+      let pedido = await Pedido.getPedidoPendiente(id_usuario);
+
+      if (!pedido) {
+        // Si no existe pedido pendiente, crear uno nuevo
+        pedido = await Pedido.crearPedido(id_usuario, []);
+      }
+
+      // Agregar producto al pedido (carrito)
+      await Pedido.agregarProductoAPedido(pedido.id, {
+        id_producto,
+        cantidad,
+        precio_unitario,
+      });
+
+      // Obtener lista actualizada del pedido
+      const pedidoActualizado = await Pedido.getDetallePedido(pedido.id_pedido);
+
+      res.status(200).json({
+        mensaje: "Producto agregado al carrito",
+        id_pedido: pedido.id,
+        pedido: pedidoActualizado,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error al agregar producto al carrito" });
+    }
+  },
 };
 
 module.exports = pedidoController;

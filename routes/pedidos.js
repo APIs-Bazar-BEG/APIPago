@@ -15,6 +15,9 @@ const manejarValidaciones = require("../middlewaress/manejarValidaciones");
 //Listar todos los pedidos
 router.get("/", pedidoController.listarPedidos);
 
+// Agregar producto al carrito
+router.post("/carrito/agregar", pedidoController.agregarProductoCarrito);
+
 //Obtener pedido por ID
 router.get(
   "/:id_pedido",
