@@ -196,6 +196,27 @@ const Pedido = {
       if (connection) connection.release();
     }
   },
+
+  vaciarCarrito: async (id_pedido) => {
+    let connection;
+    try {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Eliminar los productos del carrito
+      await connection.query("DELETE FROM detalle_pedido WHERE id_pedido = ?", [
+        id_pedido,
+      ]);
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  },
 };
 
 module.exports = Pedido;

@@ -45,6 +45,7 @@ const pagoController = {
   },
 
   // Confirmar pago y generar factura
+  // controllers/pagoController.js
   confirmarPago: async (req, res) => {
     try {
       const { paymentIntentId } = req.body;
@@ -53,7 +54,6 @@ const pagoController = {
         return res.status(400).json({ error: "Falta paymentIntentId" });
       }
 
-      // Confirmar PaymentIntent en modo sandbox
       const paymentIntent = await stripe.paymentIntents.confirm(
         paymentIntentId,
         {
@@ -69,7 +69,7 @@ const pagoController = {
       }
 
       if (paymentIntent.status === "succeeded") {
-        // Actualizar estado del pedido
+        // ✅ Actualizar estado
         await Pedido.actualizarEstadoPedido(
           id_pedido,
           "pagado",
@@ -77,14 +77,17 @@ const pagoController = {
           "Stripe"
         );
 
-        // Obtener detalles del pedido
+        // ✅ Vaciar carrito
+        await Pedido.vaciarCarrito(id_pedido);
+
+        // Obtener detalles (aunque ya no haya productos en detalle, los podemos usar de antes si quieres guardarlos en factura)
         const productos = await Pedido.getDetallePedido(id_pedido);
         const total = productos.reduce(
           (acc, p) => acc + p.precio_unitario * p.cantidad,
           0
         );
 
-        // Crear factura PDF
+        // ✅ Generar factura
         const factura = {
           id: id_pedido,
           total,
@@ -104,7 +107,7 @@ const pagoController = {
         crearFactura(factura, rutaFactura);
 
         return res.status(200).json({
-          mensaje: "Pago confirmado y pedido actualizado.",
+          mensaje: "Pago confirmado, carrito vaciado y factura generada.",
           paymentIntent,
           urlFactura: `http://localhost:3001/api/v1/pedidos/factura/${id_pedido}`,
         });
