@@ -1,3 +1,6 @@
+const axios = require("axios");
+const ADMIN_API = process.env.ADMIN_API;
+
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Pedido = require("../models/Pedido");
 const { crearFactura } = require("../utils/generadorFacturas");
@@ -9,6 +12,7 @@ const pagoController = {
   crearIntencionPago: async (req, res) => {
     try {
       const { id_usuario, productos } = req.body;
+      // productos = [{ id_producto, cantidad }]
 
       if (!productos || productos.length === 0) {
         return res
@@ -16,27 +20,51 @@ const pagoController = {
           .json({ error: "No hay productos en el pedido." });
       }
 
-      // Guardar pedido en BD
-      const nuevoPedido = await Pedido.crearPedido(id_usuario, productos);
+      // 🔥 Consultar detalles de productos desde Admin
+      const ids = productos.map((p) => p.id_producto);
+      const { data: productosAdmin } = await axios.get(
+        `${ADMIN_API}/productos`,
+        { params: { ids: ids.join(",") } } // asumiendo que Admin soporte filtro por ids
+      );
+
+      // Combinar info de cliente con precios/nombres de Admin
+      const productosConInfo = productos.map((p) => {
+        const info = productosAdmin.find((pa) => pa.id === p.id_producto);
+        if (!info)
+          throw new Error(`Producto ${p.id_producto} no encontrado en Admin`);
+        return {
+          ...p,
+          nombre: info.nombre,
+          precio_unitario: info.precio,
+          categoria: info.categoria_nombre,
+        };
+      });
 
       // Calcular total
-      const total = nuevoPedido.total;
+      const total = productosConInfo.reduce(
+        (acc, p) => acc + p.precio_unitario * p.cantidad,
+        0
+      );
 
-      // Crear PaymentIntent en Stripe
+      // Guardar pedido en BD
+      const nuevoPedido = await Pedido.crearPedido(
+        id_usuario,
+        productosConInfo
+      );
+
+      // Crear PaymentIntent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(total * 100),
         currency: "usd",
         metadata: { id_pedido: String(nuevoPedido.id_pedido) },
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: "never", // ⚠️ importante: aquí dentro
-        },
+        automatic_payment_methods: { enabled: true },
       });
 
       res.status(200).json({
         clientSecret: paymentIntent.client_secret,
         id_pedido: nuevoPedido.id_pedido,
-        urlFactura: `http://localhost:3001/api/v1/pedidos/factura/${nuevoPedido.id_pedido}`,
+        total,
+        productos: productosConInfo,
       });
     } catch (error) {
       console.error("ERROR EN CREAR INTENCIÓN:", error.message);

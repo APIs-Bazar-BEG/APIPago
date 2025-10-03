@@ -1,4 +1,7 @@
 //Controlador para manejar pedidos
+const axios = require("axios");
+const ADMIN_API = process.env.ADMIN_API;
+
 const Pedido = require("../models/Pedido");
 const { crearFactura } = require("../utils/generadorFacturas");
 
